@@ -335,10 +335,10 @@ sub get_mount {
 
     $path ||= $self->get_mount_path or return;
 
-    my ($stream_id) = $path =~ m!/streamid=(\d+)!sm;
-    if(!$stream_id) {
-        $stream_id = $path =~ m!/trackID=(\d+)!sm;
-    }
+    my ($stream_id) = $path =~ m!/trackID=(\d+)!sm;
+    # if(!$stream_id) {
+    #     $stream_id = $path =~ m!/trackID=(\d+)!sm;
+    # }
     $path =~ s!/streamid=(\d+)!!sm;
 
     my $mnt = $self->mounts->{$path};
