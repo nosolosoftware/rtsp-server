@@ -339,7 +339,7 @@ sub get_mount {
     # if(!$stream_id) {
     #     $stream_id = $path =~ m!/trackID=(\d+)!sm;
     # }
-    $path =~ s!/streamid=(\d+)!!sm;
+    $path =~ s!/trackID=(\d+)!!sm;
 
     my $mnt = $self->mounts->{$path};
     return wantarray ? ($mnt, $stream_id) : $mnt;
