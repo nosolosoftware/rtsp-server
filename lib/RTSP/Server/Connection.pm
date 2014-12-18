@@ -335,11 +335,11 @@ sub get_mount {
 
     $path ||= $self->get_mount_path or return;
     
-    my ($stream_id) = $path =~ m!/.+=(\d+)$!sm;
-    $path =~ s!/.+=(\d+)$!!sm;
+   my ($stream_id) = $path =~ m!/[a-zA-Z]+=(\d+)!sm;
+    $path =~ s!/[a-zA-Z]+=(\d+)!!sm;
 
     my $mnt = $self->mounts->{$path};
-    return wantarray ? ($mnt, $stream_id) : $mnt;
+    return wantarray ? ($mnt, $stream_id) : $mnt;;
 }
 
 # returns new mount point
