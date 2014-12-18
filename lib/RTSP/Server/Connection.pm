@@ -10,7 +10,7 @@ use Carp qw/croak/;
 use URI;
 
 has 'id' => (
-    is => 'ro',
+    is => 'ro',195.241.117.28
     isa => 'Int',
     required => 1,
 );
@@ -334,12 +334,13 @@ sub get_mount {
     my ($self, $path) = @_;
 
     $path ||= $self->get_mount_path or return;
-
-    my ($stream_id) = $path =~ m!/trackID=(\d+)!sm;
-    # if(!$stream_id) {
-    #     $stream_id = $path =~ m!/trackID=(\d+)!sm;
-    # }
-    $path =~ s!/trackID=(\d+)!!sm;
+    if(path =~ /[trackID]/) {
+        my ($stream_id) = $path =~ m!/trackID=(\d+)!sm;
+        $path =~ s!/trackID=(\d+)!!sm;
+    } else {
+        my ($stream_id) = $path =~m!/sessionid=(\d+)!sm;
+        $path =~ s!/sessionid=(\d+)!!sm;
+    }
 
     my $mnt = $self->mounts->{$path};
     return wantarray ? ($mnt, $stream_id) : $mnt;
