@@ -335,7 +335,7 @@ sub get_mount {
     my $stream_id;
 
     $path ||= $self->get_mount_path or return;
-    if(path =~ /[trackID]/) {
+    if($path =~ /[trackID]/) {
         ($stream_id) = $path =~ m!/trackID=(\d+)!sm;
         $path =~ s!/trackID=(\d+)!!sm;
     } else {
