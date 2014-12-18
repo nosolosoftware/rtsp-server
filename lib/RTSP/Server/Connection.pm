@@ -339,8 +339,8 @@ sub get_mount {
         ($stream_id) = $path =~ m!/trackID=(\d+)!sm;
         $path =~ s!/trackID=(\d+)!!sm;
     } else {
-        ($stream_id) = $path =~m!/sessionid=(\d+)!sm;
-        $path =~ s!/sessionid=(\d+)!!sm;
+        ($stream_id) = $path =~m!/streamid=(\d+)!sm;
+        $path =~ s!/streamid=(\d+)!!sm;
     }
 
     my $mnt = $self->mounts->{$path};
