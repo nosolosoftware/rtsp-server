@@ -337,8 +337,7 @@ sub get_mount {
     
     my ($stream_id) = $path =~ m!/(trackID|stream_id)=(\d+)!sm;
     $path =~ s!/(trackID|stream_id)=(\d+)!!sm;
-    print $stream_id
-    print $path
+    print $path;
     my $mnt = $self->mounts->{$path};
     return wantarray ? ($mnt, $stream_id) : $mnt;
 }
