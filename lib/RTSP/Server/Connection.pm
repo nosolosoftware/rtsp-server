@@ -123,6 +123,15 @@ sub describe {
     my $mount = $self->get_mount
         or return $self->not_found;
 
+
+    if ( $self->server->user and $self->server->password ) {
+        unless ( $self->get_req_header('Authorization') ) {
+            $self->add_resp_header('WWW-Authenticate', 'Basic realm="RTSP_SERVER"');
+            $self->unauthorized;
+            return;
+        }
+    }
+
     $self->add_resp_header('Content-Type', 'application/sdp');
 
     $self->push_ok($mount->sdp);
@@ -144,6 +153,11 @@ sub options {
 sub bad_request {
     my ($self) = @_;
     $self->push_response(400, "Bad Request");
+}
+
+sub unauthorized {
+    my ($self) = @_;
+    $self->push_response(401, "Unauthorized");
 }
 
 sub not_found {

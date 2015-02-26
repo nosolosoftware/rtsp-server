@@ -97,6 +97,22 @@ has 'mounts' => (
     traits => [ 'NoGetopt' ],
 );
 
+has 'user' => (
+    is => 'rw',
+    isa => 'Str',
+    cmd_flag => 'user',
+    cmd_aliases => 'u',
+    metaclass => 'MooseX::Getopt::Meta::Attribute',
+);
+
+has 'password' => (
+    is => 'rw',
+    isa => 'Str',
+    cmd_flag => 'password',
+    cmd_aliases => 'p',
+    metaclass => 'MooseX::Getopt::Meta::Attribute',
+);
+
 sub client_count {
     my ($self) = @_;
 
@@ -213,6 +229,8 @@ audio/video streams.
       rtp_start_port        => 20000,
       client_listen_address => '0.0.0.0',
       source_listen_address => '0.0.0.0',
+      user                  => '',
+      password              => '',
   );
 
   # listen and accept incoming connections asynchronously

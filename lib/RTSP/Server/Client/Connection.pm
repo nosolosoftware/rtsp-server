@@ -9,6 +9,7 @@ use Moose;
 use namespace::autoclean;
 use Socket;
 use Socket6;
+use MIME::Base64;
 
 has 'client_sockets' => (
     is => 'rw',
@@ -52,6 +53,17 @@ sub play {
     }
 
     # TODO: check auth
+    if ( $self->server->user and $self->server->password ) {
+      my ($authorization, $digest, $user, $password);
+      unless ( $authorization = $self->get_req_header('Authorization') and
+          ($digest) = $authorization =~ m/Basic ([a-zA-Z0-9]+)/smi and
+          ($user, $password) = split( ':', decode_base64( $digest ) ) and
+          $user eq $self->server->user and $password eq $self->server->password ){
+
+          $self->unauthorized;
+          return;
+      }
+    }
 
     $self->push_ok;
 }
