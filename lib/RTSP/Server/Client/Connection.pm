@@ -100,74 +100,83 @@ sub setup {
     my $transport = $self->get_req_header('Transport')
         or return $self->bad_request;
 
-    # parse client ports out of transport header
-    my ($client_rtp_start_port, $client_rtp_end_port) =
-        $transport =~ m/client_port=(\d+)(?:\-(\d+))/smi;
-
-    unless ($client_rtp_start_port) {
-        $self->warn("Failed to find client RTP start port in SETUP request");
-        return $self->bad_request;
-    }
 
     # register client with stream
     my $stream = $mount->get_stream($stream_id)
         or return $self->not_found;
-
-    my $local_port = $self->next_rtp_start_port;
 
     # Get transportation protocol
     my ($protocol, $packet_type);
     if ($transport =~ m/RTP\/AVP\/TCP/smi) {
       $protocol = 'tcp';
       $packet_type = SOCK_STREAM;
+
+      $transport =~ m/interleaved=0-1/smi
+        or return $self->bad_request;
+
+      $self->add_resp_header("Transport", $transport);
+
     } else {
       $protocol = 'udp';
       $packet_type = SOCK_DGRAM;
+
+      my ($client_rtp_start_port, $client_rtp_end_port);
+      # parse client ports out of transport header
+      ($client_rtp_start_port, $client_rtp_end_port) =
+          $transport =~ m/client_port=(\d+)(?:\-(\d+))/smi;
+
+      unless ($client_rtp_start_port) {
+        $self->warn("Failed to find client RTP start port in SETUP request");
+        return $self->bad_request;
+      }
+
+      my $local_port = $self->next_rtp_start_port;
+
+      # create UDP socket for this stream
+      my($name, $alias, $udp_proto) = AnyEvent::Socket::getprotobyname($protocol);
+      socket my($sock), $self->addr_family, $packet_type, $udp_proto;
+      AnyEvent::Util::fh_nonblocking $sock, 1;
+      my ($local, $dest);
+      if ($self->addr_family == AF_INET) {
+          $local = sockaddr_in($local_port, Socket::inet_aton($self->local_address));
+          $dest = sockaddr_in($client_rtp_start_port, Socket::inet_aton($self->client_address));
+      } elsif ($self->addr_family == AF_INET6) {
+          $local = sockaddr_in6($local_port, Socket6::inet_pton(AF_INET6, $self->local_address));
+          $dest = sockaddr_in6($client_rtp_start_port, Socket6::inet_pton(AF_INET6, $self->client_address));
+      }
+      bind $sock, $local;
+      unless (connect $sock, $dest) {
+          $self->error("Failed to create client socket on port $client_rtp_start_port: $!");
+          return $self->internal_server_error;
+      }
+
+      $self->client_sockets->{$stream_id} = $sock;
+      $stream->add_client($self);
+
+      # create UDP socket for the RTCP packets
+      socket my($sock_rtcp), $self->addr_family, $packet_type, $udp_proto;
+      AnyEvent::Util::fh_nonblocking $sock_rtcp, 1;
+      if ($self->addr_family == AF_INET) {
+          $local = sockaddr_in($local_port + 1, Socket::inet_aton($self->local_address));
+          $dest = sockaddr_in($client_rtp_end_port, Socket::inet_aton($self->client_address));
+      } elsif ($self->addr_family == AF_INET6) {
+          $local = sockaddr_in6($local_port + 1, Socket6::inet_pton(AF_INET6, $self->local_address));
+          $dest = sockaddr_in6($client_rtp_end_port, Socket6::inet_pton(AF_INET6, $self->client_address));
+      }
+      bind $sock_rtcp, $local;
+      unless (connect $sock_rtcp, $dest) {
+          $self->error("Failed to create client socket on port $client_rtp_end_port: $!");
+          return $self->internal_server_error;
+      }
+
+      $self->client_sockets->{$stream_id . "rtcp"} = $sock_rtcp;
+
+      # add our RTP ports to transport header response
+      my $port_range = $local_port . '-' . ($local_port + 1);
+      $self->add_resp_header("Transport", "$transport;server_port=$port_range");
     }
 
-    # create UDP socket for this stream
-    my($name, $alias, $udp_proto) = AnyEvent::Socket::getprotobyname($protocol);
-    socket my($sock), $self->addr_family, $packet_type, $udp_proto;
-    AnyEvent::Util::fh_nonblocking $sock, 1;
-    my ($local, $dest);
-    if ($self->addr_family == AF_INET) {
-        $local = sockaddr_in($local_port, Socket::inet_aton($self->local_address));
-        $dest = sockaddr_in($client_rtp_start_port, Socket::inet_aton($self->client_address));
-    } elsif ($self->addr_family == AF_INET6) {
-        $local = sockaddr_in6($local_port, Socket6::inet_pton(AF_INET6, $self->local_address));
-        $dest = sockaddr_in6($client_rtp_start_port, Socket6::inet_pton(AF_INET6, $self->client_address));
-    }
-    bind $sock, $local;
-    unless (connect $sock, $dest) {
-        $self->error("Failed to create client socket on port $client_rtp_start_port: $!");
-        return $self->internal_server_error;
-    }
-
-    $self->client_sockets->{$stream_id} = $sock;
-    $stream->add_client($self);
-
-    # create UDP socket for the RTCP packets
-    socket my($sock_rtcp), $self->addr_family, $packet_type, $udp_proto;
-    AnyEvent::Util::fh_nonblocking $sock_rtcp, 1;
-    if ($self->addr_family == AF_INET) {
-        $local = sockaddr_in($local_port + 1, Socket::inet_aton($self->local_address));
-        $dest = sockaddr_in($client_rtp_end_port, Socket::inet_aton($self->client_address));
-    } elsif ($self->addr_family == AF_INET6) {
-        $local = sockaddr_in6($local_port + 1, Socket6::inet_pton(AF_INET6, $self->local_address));
-        $dest = sockaddr_in6($client_rtp_end_port, Socket6::inet_pton(AF_INET6, $self->client_address));
-    }
-    bind $sock_rtcp, $local;
-    unless (connect $sock_rtcp, $dest) {
-        $self->error("Failed to create client socket on port $client_rtp_end_port: $!");
-        return $self->internal_server_error;
-    }
-
-    $self->client_sockets->{$stream_id . "rtcp"} = $sock_rtcp;
-
-    # add our RTP ports to transport header response
-    my $port_range = $local_port . '-' . ($local_port + 1);
-    $self->add_resp_header("Transport", "$transport;server_port=$port_range");
-
+    $self->client_sockets->{$stream_id . "protocol"} = $protocol;
     $self->push_ok;
 }
 
@@ -175,9 +184,15 @@ sub send_packet {
     my ($self, $stream_id, $pkt) = @_;
 
     my $sock = $self->client_sockets->{$stream_id}
-    or return;
-    my $type_byte = ord(substr($pkt, 1, 1));
-    $sock = $self->client_sockets->{$stream_id . "rtcp"} if ($type_byte >= 200 && $type_byte <= 204);
+      or return;
+
+    if ( $self->client_sockets->{$stream_id . "protocol" } eq 'tcp' ){
+      my $size = length($pkt);
+      $self->server->h->push_write( "\$" . pack('b8',$size) . $size . $pkt )
+    } else {
+      my $type_byte = ord(substr($pkt, 1, 1));
+      $sock = $self->client_sockets->{$stream_id . "rtcp"} if ($type_byte >= 200 && $type_byte <= 204);
+    }
 
     return send $sock, $pkt, 0;
 }
