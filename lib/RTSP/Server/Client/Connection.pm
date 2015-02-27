@@ -115,9 +115,19 @@ sub setup {
 
     my $local_port = $self->next_rtp_start_port;
 
+    # Get transportation protocol
+    my ($protocol, $packet_type);
+    if ($transport =~ m/RTP\/AVP\/TCP/smi) {
+      $protocol = 'tcp';
+      $packet_type = SOCK_STREAM;
+    } else {
+      $protocol = 'udp';
+      $packet_type = SOCK_DGRAM;
+    }
+
     # create UDP socket for this stream
-    my($name, $alias, $udp_proto) = AnyEvent::Socket::getprotobyname('udp');
-    socket my($sock), $self->addr_family, SOCK_DGRAM, $udp_proto;
+    my($name, $alias, $udp_proto) = AnyEvent::Socket::getprotobyname($protocol);
+    socket my($sock), $self->addr_family, $packet_type, $udp_proto;
     AnyEvent::Util::fh_nonblocking $sock, 1;
     my ($local, $dest);
     if ($self->addr_family == AF_INET) {
@@ -137,7 +147,7 @@ sub setup {
     $stream->add_client($self);
 
     # create UDP socket for the RTCP packets
-    socket my($sock_rtcp), $self->addr_family, SOCK_DGRAM, $udp_proto;
+    socket my($sock_rtcp), $self->addr_family, $packet_type, $udp_proto;
     AnyEvent::Util::fh_nonblocking $sock_rtcp, 1;
     if ($self->addr_family == AF_INET) {
         $local = sockaddr_in($local_port + 1, Socket::inet_aton($self->local_address));
